@@ -50,10 +50,6 @@ function checkFormatting() {
   return true
 }
 
-function testFindPart() {
-  Logger.log(findPart(1234567890, "8c3rWXDyxEZnX5e1kPRjtfbYMvVw661DfjJynJzKGeJKPX4nA15Mkxw3Oj4sNTHg"))
-}
-
 function findPart(partBarcode, apikey) {
   // create find endpoint
   const findEndpoint = endpoint + "/action/findOne"
