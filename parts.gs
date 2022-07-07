@@ -1,4 +1,4 @@
-const insertEndpoint = "https://data.mongodb-api.com/app/data-rapuj/endpoint/data/v1/action/insertOne"
+const endpoint = "https://data.mongodb-api.com/app/data-rapuj/endpoint/data/v1"
 const clusterName = "Cluster1"
 const databaseName = "partsDB"
 const collectionName = "parts"
@@ -24,14 +24,14 @@ function checkFormatting() {
       // check for empty cells
       if (data[row][col] === "") {
         SpreadsheetApp.getUi().alert("Empty cell at \nRow: " + (row + 1).toString() + ". \nColumn: " + columnVals[col])
-        return
+        return false
       }
       
       // make sure isConsumable is set to true/false
       if (col === 3) {
         if (data[row][col] !== true && data[row][col] !== false) {
           SpreadsheetApp.getUi().alert("Issue with:\nRow: " + (row + 1).toString() + ". \nColumn: " + columnVals[col] + "\nIs Consumable column must be set to true or false")
-          return
+          return false
         }
       }
 
@@ -40,18 +40,68 @@ function checkFormatting() {
         // if parsing the element to an int returns a NaN, then it's probably not an integer
         if (isNaN(parseInt(data[row][col]))) {
           SpreadsheetApp.getUi().alert("Stock must be a number:\nRow: " + (row + 1).toString() + ". \nColumn: " + columnVals[col])
-          return
+          return false
         }
       }
     }
   }
 
   SpreadsheetApp.getUi().alert("No formatting issues detected")
+  return true
+}
+
+function testFindPart() {
+  Logger.log(findPart(1234567890, "8c3rWXDyxEZnX5e1kPRjtfbYMvVw661DfjJynJzKGeJKPX4nA15Mkxw3Oj4sNTHg"))
+}
+
+function findPart(partBarcode, apikey) {
+  // create find endpoint
+  const findEndpoint = endpoint + "/action/findOne"
+  
+  // query to search via barcode
+  const query = {barcode: partBarcode}
+
+  const payload = {
+    filter: query,
+    collection: collectionName,
+    database: databaseName,
+    dataSource: clusterName
+  }
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    headers: { "api-key": apikey }
+ }
+
+  const response = UrlFetchApp.fetch(findEndpoint, options);
+
+  // parse response object to a JS Object
+  const parsedResponse = JSON.parse(response.getContentText())
+
+  if (parsedResponse.document == null) {
+    // part didn't exist in database
+    return false
+  }
+  else {
+    // part exists in database
+    return true
+  }
 
 }
 
 function insertParts() {
   const apikey = getAPIKey()
+  // add insert action to endpoint
+  const insertEndpoint = endpoint + "/action/insertOne"
+
+  var duplicateParts = []
+
+  if (!checkFormatting()) {
+    return false
+  }
+
   var sheet = SpreadsheetApp.getActiveSheet()
   var data = sheet.getDataRange().getValues()
 
@@ -70,7 +120,17 @@ function insertParts() {
     document.category = data[row][6]
     document.imageUrl = data[row][7]
     document.type = data[row][3] ? "Consumable" : "Returnable"
-  
+
+    // if part with matching barcode found
+    if (findPart(document.barcode, apikey)) {
+      
+      // push the row # + 1 to the array
+      duplicateParts.push(row + 1)
+      
+      // skip current iteration and go to next loop iteration
+      continue
+    }
+
     const payload = {
       document: document, 
       collection: collectionName,
@@ -88,7 +148,12 @@ function insertParts() {
     const response = UrlFetchApp.fetch(insertEndpoint, options);
   }
 
-  SpreadsheetApp.getUi().alert("Success!")
+  if (duplicateParts.length === 0) {
+    SpreadsheetApp.getUi().alert("Success! All parts added!")
+  }
+  else {
+    SpreadsheetApp.getUi().alert("Duplicate parts in rows: " + duplicateParts + "\nNon-duplicate items were inserted successfully")
+  }
         
 }
 
