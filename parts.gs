@@ -95,7 +95,7 @@ function insertParts() {
   var duplicateParts = []
 
   if (!checkFormatting()) {
-    return false
+    return
   }
 
   var sheet = SpreadsheetApp.getActiveSheet()
@@ -151,5 +151,168 @@ function insertParts() {
     SpreadsheetApp.getUi().alert("Duplicate parts in rows: " + duplicateParts + "\nNon-duplicate items were inserted successfully")
   }
         
+}
+
+function clearSheet() {
+  var sheet = SpreadsheetApp.getActiveSheet()
+  var data = sheet.getDataRange().getValues()
+  sheet.getRange(2, 1, data.length, 8).clearContent()
+}
+
+function viewParts() {
+  const apikey = getAPIKey()
+
+  var sheet = SpreadsheetApp.getActiveSheet()
+  var data = sheet.getDataRange().getValues()
+
+  // delete previous data
+  clearSheet()
+
+  // create endpoint to find all parts
+  const findEndpoint = endpoint + "/action/find"
+
+  const payload = {
+    collection: collectionName,
+    database: databaseName,
+    dataSource: clusterName
+  }
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    headers: { "api-key": apikey }
+ }
+
+  const response = UrlFetchApp.fetch(findEndpoint, options);
+
+  // parse response object to a JS Object
+  const parsedResponse = JSON.parse(response.getContentText())
+
+  const allParts = parsedResponse.documents
+
+  for (var i = 0; i < allParts.length; i++) {
+
+    const part = allParts[i]
+    const rowValues = [part.partName, part.barcode, part.datasheet, part.isConsumable, part.description, part.stock, part.category, part.imageUrl]
+
+    sheet.getRange(i+2, 1, 1, rowValues.length).setValues([rowValues])
+    
+  }
+
+}
+
+function updateParts() {
+  const apikey = getAPIKey()
+  // add insert action to endpoint
+  const updateEndpoint = endpoint + "/action/updateOne"
+
+  var invalidParts = []
+
+  if (!checkFormatting()) {
+    return
+  }
+
+  var sheet = SpreadsheetApp.getActiveSheet()
+  var data = sheet.getDataRange().getValues()
+
+  // loop through each row (excluding 1st row)
+  for (var row = 1; row < data.length; row++) {
+    
+    // add in each row element
+    var update = {}
+    
+    const barcode = data[row][1]
+
+    update.partName = data[row][0]
+    update.datasheet = data[row][2]
+    update.isConsumable = data[row][3]
+    update.description = data[row][4]
+    update.stock = parseInt(data[row][5])
+    update.category = data[row][6]
+    update.imageUrl = data[row][7]
+    update.type = data[row][3] ? "Consumable" : "Returnable"
+
+    // if no parts with matching barcode found
+    if (!findPart(barcode, apikey)) {
+      
+      // push the row # + 1 to the array
+      invalidParts.push(row + 1)
+      
+      // skip current iteration and go to next loop iteration
+      continue
+    }
+
+    const payload = {
+      collection: collectionName,
+      database: databaseName, 
+      dataSource: clusterName,
+      filter: {barcode: barcode},
+      update: {$set: update},
+      upsert: false
+    }
+
+    const options = {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      headers: { "api-key": apikey }
+    };
+
+    const response = UrlFetchApp.fetch(updateEndpoint, options);
+  }
+
+  if (invalidParts.length === 0) {
+    SpreadsheetApp.getUi().alert("Success! All parts updated!")
+  }
+  else {
+    SpreadsheetApp.getUi().alert("Invalid part barcodes in rows: " + invalidParts + "\nOther parts were inserted successfully")
+  }
+}
+
+function deleteParts() {
+  const apikey = getAPIKey()
+  var sheet = SpreadsheetApp.getActiveSheet()
+  var data = sheet.getDataRange().getValues()
+
+  var invalidBarcodeRows = []
+
+  const deleteEndpoint = endpoint + "/action/deleteOne"
+
+  for (var row = 1; row < data.length; row++) {
+    const barcodeToDelete = data[row][0]
+
+    if (!findPart(barcodeToDelete, apikey)) {
+      invalidBarcodeRows.push(row+1)
+      continue
+    }
+
+    // query to search via barcode
+    const query = {barcode: barcodeToDelete}
+
+    const payload = {
+      filter: query,
+      collection: collectionName,
+      database: databaseName,
+      dataSource: clusterName
+    }
+
+    const options = {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      headers: { "api-key": apikey }
+  }
+
+    const response = UrlFetchApp.fetch(deleteEndpoint, options);
+
+  }
+
+  if (invalidBarcodeRows.length === 0) {
+    SpreadsheetApp.getUi().alert("All parts with barcodes specified were deleted successfully")
+  }
+  else {
+    SpreadsheetApp.getUi().alert("Invalid barcode in rows: " + invalidBarcodeRows + "\nAll other parts were deleted successfully")
+  }
 }
 
