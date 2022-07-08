@@ -6,11 +6,26 @@ const collectionName = "parts"
 const columnVals = ["Part Name", "Barcode", "Datasheet", "Is Consumable", "Description", "Stock", "Category", "Image URL"]
 
 function getAPIKey() {
-  var result = SpreadsheetApp.getUi().prompt(
-   'Enter API Key',
-   'Key:', SpreadsheetApp.getUi().ButtonSet);
-  const apikey = result.getResponseText()
+  const userProperties = PropertiesService.getUserProperties();
+  let apikey = userProperties.getProperty('APIKEY');
+  let resetKey = false; //Make true if you have to change key
+  if (apikey == null || resetKey ) {
+    var result = SpreadsheetApp.getUi().prompt(
+    'Enter API Key',
+    'Key:', SpreadsheetApp.getUi().ButtonSet);
+    apikey = result.getResponseText()
+    userProperties.setProperty('APIKEY', apikey);
+  }
   return apikey;
+}
+
+function changeAPIKey() {
+  const userProperties = PropertiesService.getUserProperties();
+  var result = SpreadsheetApp.getUi().prompt(
+  'Enter API Key',
+  'Key:', SpreadsheetApp.getUi().ButtonSet);
+  apikey = result.getResponseText()
+  userProperties.setProperty('APIKEY', apikey);
 }
 
 function checkFormatting() {
