@@ -23,9 +23,12 @@ function changeAPIKey() {
   const userProperties = PropertiesService.getUserProperties();
   var result = SpreadsheetApp.getUi().prompt(
   'Enter API Key',
-  'Key:', SpreadsheetApp.getUi().ButtonSet);
-  apikey = result.getResponseText()
-  userProperties.setProperty('APIKEY', apikey);
+  'Key:', SpreadsheetApp.getUi().ButtonSet.OK_CANCEL);
+  
+  if (result.getSelectedButton() == SpreadsheetApp.getUi().Button.OK) {
+    const apikey = result.getResponseText()
+    userProperties.setProperty('APIKEY', apikey);
+  }
 }
 
 function checkFormatting() {
